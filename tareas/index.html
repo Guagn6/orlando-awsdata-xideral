@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Datos: Netflix</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --netflix-red: #e50914;
+            --netflix-dark: #141414;
+            --netflix-gray: #221f1f;
+            --primary-color: #e50914;
+            --secondary-color: #64748b;
+            --accent-color: #06b6d4;
+            --dark-bg: #0f0f0f;
+            --card-bg: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --border-color: #333333;
+            --gradient-primary: linear-gradient(135deg, #e50914, #b81d24);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--dark-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .hero-header {
+            background: var(--gradient-primary);
+            padding: 4rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.2;
+        }
+
+        .netflix-logo {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: var(--netflix-red);
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            margin-bottom: 1rem;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .hero-subtitle {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+        }
+
+        .main-content {
+            padding: 4rem 0;
+        }
+
+        .content-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .content-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: var(--gradient-primary);
+            transition: all 0.6s ease;
+        }
+
+        .content-card:hover::before {
+            left: 0;
+        }
+
+        .content-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(229, 9, 20, 0.2);
+            border-color: var(--netflix-red);
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--netflix-red);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-subtitle {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .description {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+        }
+
+        .dataset-info {
+            background: linear-gradient(135deg, rgba(229, 9, 20, 0.1), rgba(184, 29, 36, 0.1));
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+            border-left: 4px solid var(--netflix-red);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .info-item {
+            background: rgba(229, 9, 20, 0.1);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .info-item:hover {
+            background: rgba(229, 9, 20, 0.2);
+            transform: scale(1.05);
+        }
+
+        .info-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--netflix-red);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .code-snippet {
+            background: #0d1117;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .method-card {
+            background: var(--netflix-gray);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .method-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .method-description {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, rgba(229, 9, 20, 0.3), rgba(184, 29, 36, 0.3));
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-placeholder {
+            background: var(--netflix-gray);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            margin: 2rem 0;
+            color: var(--text-secondary);
+        }
+
+        .chart-placeholder i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--netflix-red);
+        }
+
+        .analysis-results {
+            background: var(--gradient-primary);
+            border-radius: 16px;
+            padding: 3rem;
+            margin: 3rem 0;
+            text-align: center;
+        }
+
+        .result-item {
+            margin: 1.5rem 0;
+        }
+
+        .result-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2.5rem;
+            }
+            
+            .hero-subtitle {
+                font-size: 1.1rem;
+            }
+            
+            .content-card {
+                padding: 1.5rem;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            animation: fadeInUp 0.8s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <header class="hero-header">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 text-center hero-content">
+                    <div class="netflix-logo pulse">NETFLIX</div>
+                    <h1 class="hero-title">Análisis de Datos</h1>
+                    <p class="hero-subtitle">
+                        Exploración del catálogo de Netflix con pandas y visualizaciones
+                    </p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Dataset Overview -->
+            <div class="content-card fade-in">
+                <h2 class="section-title">
+                    <i class="fas fa-database"></i>
+                    Conjunto de Datos Netflix
+                </h2>
+                <p class="description">
+                    Análisis completo del archivo <span class="highlight">netflix_titles.csv</span> 
+                    que contiene información detallada sobre películas y series disponibles en la plataforma.
+                </p>
+                
+                <div class="dataset-info">
+                    <h4 class="section-subtitle">Información del Dataset</h4>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-number">8,807</span>
+                            <span class="info-label">Total de Títulos</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-number">12</span>
+                            <span class="info-label">Columnas de Datos</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-number">6,131</span>
+                            <span class="info-label">Películas</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-number">2,676</span>
+                            <span class="info-label">Series de TV</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Structure -->
+            <div class="content-card fade-in">
+                <h2 class="section-title">
+                    <i class="fas fa-table"></i>
+                    Estructura de los Datos
+                </h2>
+                <p class="description">
+                    El dataset incluye las siguientes columnas principales:
+                </p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="method-card">
+                            <h4 class="method-title">
+                                <i class="fas fa-id-card"></i>
+                                Identificación
+                            </h4>
+                            <ul class="text-secondary">
+                                <li><strong>show_id:</strong> ID único del contenido</li>
+                                <li><strong>type:</strong> Movie o TV Show</li>
+                                <li><strong>title:</strong> Título del contenido</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="method-card">
+                            <h4 class="method-title">
+                                <i class="fas fa-info"></i>
+                                Metadatos
+                            </h4>
+                            <ul class="text-secondary">
+                                <li><strong>director:</strong> Director(es) del contenido</li>
+                                <li><strong>cast:</strong> Reparto principal</li>
+                                <li><strong>country:</strong> País de origen</li>
+                                <li><strong>rating:</strong> Clasificación por edades</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="method-card">
+                            <h4 class="method-title">
+                                <i class="fas fa-calendar"></i>
+                                Fechas y Duración
+                            </h4>
+                            <ul class="text-secondary">
+                                <li><strong>date_added:</strong> Fecha de incorporación</li>
+                                <li><strong>release_year:</strong> Año de estreno</li>
+                                <li><strong>duration:</strong> Duración (min o temporadas)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="method-card">
+                            <h4 class="method-title">
+                                <i class="fas fa-tags"></i>
+                                Clasificación
+                            </h4>
+                            <ul class="text-secondary">
+                                <li><strong>listed_in:</strong> Géneros y categorías</li>
+                                <li><strong>description:</strong> Sinopsis del contenido</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Análisis de Métodos -->
+            <div class="content-card fade-in">
+                <h2 class="section-title">
+                    <i class="fas fa-code"></i>
+                    Métodos de pandas Utilizados
+                </h2>
+                
+                <div class="method-card">
+                    <h4 class="method-title">
+                        <i class="fas fa-eye"></i>
+                        .head() - Exploración Inicial
+                    </h4>
+                    <p class="method-description">
+                        Muestra las primeras filas del DataFrame. Recibe un int que indica el número de filas por mostrar.
+                        Si no recibe argumento, muestra 5 filas por defecto.
+                    </p>
+                    <div class="code-snippet">
+                        <pre><code>df.head(3)  # Muestra las primeras 3 filas</code></pre>
+                    </div>
+                </div>
+
+                <div class="method-card">
+                    <h4 class="method-title">
+                        <i class="fas fa-search"></i>
+                        .isna() y .sum() - Detección de Valores Faltantes
+                    </h4>
+                    <p class="method-description">
+                        Detecta valores faltantes (NaN) y cuenta la cantidad total de valores nulos por columna.
+                    </p>
+                    <div class="code-snippet">
+                        <pre><code>df["title"].isna().sum()  # Cuenta valores nulos en la columna title</code></pre>
+                    </div>
+                </div>
+
+                <div class="method-card">
+                    <h4 class="method-title">
+                        <i class="fas fa-chart-bar"></i>
+                        .value_counts() - Conteo de Frecuencias
+                    </h4>
+                    <p class="method-description">
+                        Cuenta la frecuencia de valores únicos en una Series. Útil para análisis categórico.
+                    </p>
+                    <div class="code-snippet">
+                        <pre><code>df["type"].value_counts()  # Cuenta Movies vs TV Shows</code></pre>
+                    </div>
+                </div>
+
+                <div class="method-card">
+                    <h4 class="method-title">
+                        <i class="fas fa-layer-group"></i>
+                        .groupby() y .mean() - Análisis por Grupos
+                    </h4>
+                    <p class="method-description">
+                        Agrupa datos por una o más columnas y aplica funciones de agregación como promedio.
+                    </p>
+                    <div class="code-snippet">
+                        <pre><code>df.groupby("type")["duration"].mean()  # Promedio de duración por tipo</code></pre>
+                    </div>
+                </div>
+
+                <div class="method-card">
+                    <h4 class="method-title">
+                        <i class="fas fa-filter"></i>
+                        .loc[] - Selección Condicional
+                    </h4>
+                    <p class="method-description">
+                        Selecciona y asigna datos dentro de un DataFrame por filas y/o columnas usando condiciones.
+                    </p>
+                    <div class="code-snippet">
+                        <pre><code>df.loc[df["type"] == "Movie", "duration"].mean()  # Promedio de películas</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Análisis de Duración -->
+            <div class="content-card fade-in">
+                <h2 class="section-title">
+                    <i class="fas fa-clock"></i>
+                    Análisis de Duración: Dos Métodos
+                </h2>
+                
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="method-card">
+                            <h4 class="method-title">Método 1: GroupBy</h4>
+                            <p class="method-description">
+                                Utilizando <span class="highlight">groupby()</span> para agrupar por tipo de contenido y calcular promedios.
+                            </p>
+                            <div class="code-snippet">
+                                <pre><code># Limpiar datos de duración
+df["duration"] = df["duration"].str.replace(r'[^0-9]', '', regex=True).astype(float)
+
+# Agrupar y calcular promedio
+df.groupby("type")["duration"].mean()</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="method-card">
+                            <h4 class="method-title">Método 2: Filtrado con .loc[]</h4>
+                            <p class="method-description">
+                                Usando <span class="highlight">.loc[]</span> para filtrar y calcular promedios por separado.
+                            </p>
+                            <div class="code-snippet">
+                                <pre><code># Filtrar y calcular por separado
+avgMovie = df.loc[df["type"] == "Movie", "duration"].mean()
+avgTvShow = df.loc[df["type"] == "TV Show", "duration"].mean()
+
+round(avgMovie, 0)  # ~100 minutos
+round(avgTvShow, 0)  # ~2 temporadas</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analysis-results">
+                    <h3 class="mb-4">Resultados del Análisis</h3>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="result-item">
+                                <span class="result-value">99.6 min</span>
+                                <span class="result-label">Duración promedio de películas</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="result-item">
+                                <span class="result-value">1.8 temp</span>
+                                <span class="result-label">Promedio de temporadas de series</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="method-card">
+                    <h4 class="method-title">
+                        <i class="fas fa-code"></i>
+                        Código de Visualización
+                    </h4>
+                    <div class="code-snippet">
+                        <pre><a>https://guagn6.github.io/orlando-awsdata-xideral/tareas/pandas-netflix-tarea1.html"</a></pre>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- Visualizaciones -->
+            <div class="content-card fade-in">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-line"></i>
+                    Visualizaciones con matplotlib y seaborn
+                </h2>
+                <p class="description">
+                    Se utilizaron las librerías matplotlib y seaborn para crear gráficos informativos del dataset.
+                </p>
+
+                <div class="row">
+                    <div class="col-lg-4">
+                        <div class="chart-placeholder">
+                            <i class="fas fa-line-chart"></i>
+                            <h5>Títulos por Año de Estreno</h5>
+                            <p>Gráfico de línea mostrando la evolución temporal del contenido desde 1925 hasta 2021</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="chart-placeholder">
+                            <i class="fas fa-bar-chart"></i>
+                            <h5>Top 10 Clasificaciones</h5>
+                            <p>Gráfico de barras con las clasificaciones por edades más frecuentes</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="chart-placeholder">
+                            <i class="fas fa-th"></i>
+                            <h5>Matriz de Correlación</h5>
+                            <p>Mapa de calor mostrando correlaciones entre variables numéricas</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="method-card">
+                    <h4 class="method-title">
+                        <i class="fas fa-code"></i>
+                        Código de Visualización
+                    </h4>
+                    <div class="code-snippet">
+                        <pre><a>https://guagn6.github.io/orlando-awsdata-xideral/tareas/pandas-netflix-tarea2.html</a></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas Finales -->
+            <div class="content-card fade-in">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-pie"></i>
+                    Estadísticas del Dataset
+                </h2>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-number">2014</span>
+                        <span class="info-label">Año promedio de estreno</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-number">1925-2021</span>
+                        <span class="info-label">Rango temporal</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-number">6,173</span>
+                        <span class="info-label">Títulos con director</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-number">7,982</span>
+                        <span class="info-label">Títulos con cast</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationDelay = '0.2s';
+                    entry.target.classList.add('fade-in');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        // Observe all fade-in elements
+        document.addEventListener('DOMContentLoaded', () => {
+            const fadeElements = document.querySelectorAll('.fade-in');
+            fadeElements.forEach(el => {
+                observer.observe(el);
+            });
+        });
+
+        // Animate numbers on scroll
+        function animateValue(element, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const current = Math.floor(progress * (end - start) + start);
+                element.textContent = current.toLocaleString();
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Observe number animations
+        const numberObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const element = entry.target;
+                    const finalValue = parseInt(element.textContent.replace(/,/g, ''));
+                    if (!isNaN(finalValue)) {
+                        animateValue(element, 0, finalValue, 2000);
+                        numberObserver.unobserve(element);
+                    }
+                }
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const numberElements = document.querySelectorAll('.info-number');
+            numberElements.forEach(el => {
+                if (!isNaN(parseInt(el.textContent.replace(/,/g, '')))) {
+                    numberObserver.observe(el);
+                }
+            });
+        });
+
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        // Dynamic background effect
+        document.addEventListener('mousemove', (e) => {
+            const cards = document.querySelectorAll('.content-card');
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const rotateX = (y - centerY) / 20;
+                    const rotateY = (centerX - x) / 20;
+                    
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(10px)`;
+                } else {
+                    card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0px)';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
