@@ -11,7 +11,8 @@
     --galaxy-dark: #0a0a0f;
     --glow-purple: #9d4edd;
     --glow-blue: #4cc9f0;
-    --glow-pink: #f72585;
+    --glow-red: #dc2626;
+    --glow-crimson: #991b1b;
     --glow-green: #06ffa5;
     --glow-orange: #ff6b35;
     --glow-cyan: #00f5ff;
@@ -75,21 +76,22 @@ body::before {
 }
 
 .task-card {
-    background: linear-gradient(135deg, #2a2a3e 0%, #353548 100%);
+    background: #2a2a3e;
     border-radius: 20px;
     padding: 2rem;
     margin-bottom: 2rem;
     box-shadow: 
-        var(--card-shadow),
-        inset 0 1px 1px rgba(255,255,255,0.1);
+        20px 20px 40px rgba(0, 0, 0, 0.4),
+        -20px -20px 40px rgba(255, 255, 255, 0.02),
+        inset 5px 5px 10px rgba(0, 0, 0, 0.2),
+        inset -5px -5px 10px rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255,255,255,0.1);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
     cursor: pointer;
     text-decoration: none;
     color: #e0e0e0;
-    backdrop-filter: blur(10px);
 }
 
 .task-card::before {
@@ -108,10 +110,16 @@ body::before {
 }
 
 .task-card:hover {
-    transform: translateY(-10px) scale(1.02);
-    box-shadow: 0 30px 60px rgba(0,0,0,0.2);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 
+        25px 25px 50px rgba(0, 0, 0, 0.5),
+        -25px -25px 50px rgba(255, 255, 255, 0.03),
+        inset 8px 8px 16px rgba(0, 0, 0, 0.1),
+        inset -8px -8px 16px rgba(255, 255, 255, 0.08),
+        0 0 30px rgba(157, 78, 221, 0.3);
     text-decoration: none;
-    color: inherit;
+    color: #f0f0f0;
+    border: 1px solid rgba(255,255,255,0.1);
 }
 
 .card-icon {
@@ -156,13 +164,15 @@ body::before {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--glow-purple) 0%, var(--glow-pink) 100%);
+    background: linear-gradient(135deg, var(--glow-purple) 0%, var(--glow-blue) 100%);
     border: none;
     color: white;
     font-size: 1.5rem;
     box-shadow: 
-        0 10px 30px rgba(0,0,0,0.5),
-        0 0 20px rgba(157,78,221,0.4);
+        10px 10px 20px rgba(0,0,0,0.5),
+        -10px -10px 20px rgba(255,255,255,0.02),
+        inset 2px 2px 5px rgba(0,0,0,0.2),
+        inset -2px -2px 5px rgba(255,255,255,0.1);
     transition: all 0.3s ease;
     z-index: 1000;
 }
@@ -170,17 +180,24 @@ body::before {
 .add-task-btn:hover {
     transform: scale(1.1);
     box-shadow: 
-        0 15px 40px rgba(0,0,0,0.6),
-        0 0 30px rgba(157,78,221,0.6);
+        15px 15px 30px rgba(0,0,0,0.6),
+        -15px -15px 30px rgba(255,255,255,0.03),
+        inset 3px 3px 8px rgba(0,0,0,0.1),
+        inset -3px -3px 8px rgba(255,255,255,0.15),
+        0 0 30px rgba(157, 78, 221, 0.6);
     color: white;
 }
 
 .modal-content {
     border-radius: 20px;
     border: none;
-    background: linear-gradient(135deg, #2a2a3e 0%, #353548 100%);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: #2a2a3e;
+    box-shadow: 
+        20px 20px 40px rgba(0, 0, 0, 0.4),
+        -20px -20px 40px rgba(255, 255, 255, 0.02),
+        inset 5px 5px 10px rgba(0, 0, 0, 0.2),
+        inset -5px -5px 10px rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255,255,255,0.05);
     color: #e0e0e0;
 }
 
@@ -193,16 +210,21 @@ body::before {
 
 .form-control, .form-select {
     border-radius: 10px;
-    border: 2px solid rgba(255,255,255,0.2);
+    border: none;
+    background: #2a2a3e;
+    box-shadow: 
+        inset 8px 8px 16px rgba(0, 0, 0, 0.3),
+        inset -8px -8px 16px rgba(255, 255, 255, 0.05);
     transition: all 0.3s ease;
-    background: rgba(255,255,255,0.1);
     color: #e0e0e0;
 }
 
 .form-control:focus, .form-select:focus {
-    border-color: var(--glow-purple);
-    box-shadow: 0 0 0 0.25rem rgba(157, 78, 221, 0.25);
-    background: rgba(255,255,255,0.15);
+    box-shadow: 
+        inset 10px 10px 20px rgba(0, 0, 0, 0.4),
+        inset -10px -10px 20px rgba(255, 255, 255, 0.08),
+        0 0 0 0.25rem rgba(157, 78, 221, 0.25);
+    background: #2a2a3e;
     color: #f0f0f0;
 }
 
@@ -215,28 +237,77 @@ body::before {
     font-weight: 500;
 }
 
+
+.form-select option {
+    background-color: #2a2a3e;
+    color: #e0e0e0;
+    border: none;
+    padding: 10px;
+}
+
+.form-select::-webkit-scrollbar {
+    width: 8px;
+}
+
+.form-select::-webkit-scrollbar-track {
+    background: #1a1a2e;
+    border-radius: 4px;
+}
+
+.form-select::-webkit-scrollbar-thumb {
+    background: var(--glow-purple);
+    border-radius: 4px;
+}
+
+.form-select::-webkit-scrollbar-thumb:hover {
+    background: var(--glow-blue);
+}
+
 .btn-primary {
     background: linear-gradient(135deg, var(--glow-purple) 0%, var(--glow-blue) 100%);
     border: none;
     border-radius: 10px;
     padding: 10px 30px;
     transition: all 0.3s ease;
-    box-shadow: 0 5px 15px rgba(157, 78, 221, 0.3);
+    box-shadow: 
+        5px 5px 10px rgba(0, 0, 0, 0.3),
+        -5px -5px 10px rgba(255, 255, 255, 0.02),
+        inset 2px 2px 4px rgba(0, 0, 0, 0.2),
+        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 
-        0 8px 20px rgba(157, 78, 221, 0.4),
+        8px 8px 16px rgba(0, 0, 0, 0.4),
+        -8px -8px 16px rgba(255, 255, 255, 0.03),
+        inset 1px 1px 3px rgba(0, 0, 0, 0.1),
+        inset -1px -1px 3px rgba(255, 255, 255, 0.15),
         0 0 20px rgba(157, 78, 221, 0.3);
-    background: linear-gradient(135deg, var(--glow-purple) 0%, var(--glow-blue) 100%);
+    background: linear-gradient(135deg, var(--glow-purple) 0%, var(--glow-red) 100%);
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: #2a2a3e;
     border: none;
     border-radius: 10px;
     padding: 10px 30px;
+    box-shadow: 
+        5px 5px 10px rgba(0, 0, 0, 0.3),
+        -5px -5px 10px rgba(255, 255, 255, 0.02),
+        inset 2px 2px 4px rgba(0, 0, 0, 0.2),
+        inset -2px -2px 4px rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+}
+
+.btn-secondary:hover {
+    background: #353548;
+    box-shadow: 
+        8px 8px 16px rgba(0, 0, 0, 0.4),
+        -8px -8px 16px rgba(255, 255, 255, 0.03),
+        inset 1px 1px 3px rgba(0, 0, 0, 0.1),
+        inset -1px -1px 3px rgba(255, 255, 255, 0.15);
+    color: #f0f0f0;
 }
 
 .fade-in {
