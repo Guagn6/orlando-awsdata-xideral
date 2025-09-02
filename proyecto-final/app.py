@@ -1,279 +1,551 @@
+import os
+from dotenv import load_dotenv
+import mysql.connector
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import seaborn as sns
 import numpy as np
-from math import pi
+from scipy.stats import ttest_ind
+import json
+# import boto3 # dependendcias agregadas
+# from botocore.exceptions import ClientError
+
+# lambda_client = boto3.client("lambda", region_name="us-east-1")
+# s3 = boto3.client("s3")
+
+# BUCKET = "xideralaws-curso-orlando"
+# KEY = "student-performance.csv"
+# LAMBDA_NAME = "lambda-function"
+
+# Cargar variables desde .env
+load_dotenv()
+
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
+
+def get_connection():
+    return mysql.connector.connect(
+        host=DB_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS
+    )
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Análisis de Datos de Spotify",
-    page_icon="🎵",
+    page_title="Análisis de Datos",
+    page_icon="📚",
     layout="wide"
 )
 
-# Título principal
-st.title("🎵 Análisis Completo de Datos de Spotify")
+# Inicialización de estado de sesión
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'show_analysis' not in st.session_state:
+    st.session_state.show_analysis = False
 
-# Sidebar 
-st.sidebar.title("Panel de Control")
-
-# Carga de archivo
-file = st.sidebar.file_uploader("Carga tu archivo CSV aquí", type=['csv'])
-st.sidebar.caption("Sube tu archivo de datos de Spotify para comenzar el análisis")
-
-if file is None:
-    st.warning("⚠️ Inserta tu archivo CSV para visualizar los datos de análisis")
-    st.info("**Formato esperado del archivo:**")
-    st.code("""
-    danceability,energy,key,loudness,mode,speechiness,acousticness,
-    instrumentalness,liveness,valence,tempo,duration_ms,time_signature,liked
-    """)
-    st.stop()
-
-# Lectura de datos
+# Función AWS Lambda (en entorno real requiere las credenciales AWS)
 @st.cache_data
-def load_data(file):
-    df = pd.read_csv(file)
-    df["duration_min"] = df["duration_ms"] / 60000
+def aws_lambda_processing(file_content):
+    
+    df = pd.read_csv(file_content)
+    
+    numeric_columns = ['StudentID', 'Age', 'Gender', 'Ethnicity', 'ParentalEducation', 
+                      'StudyTimeWeekly', 'Absences', 'Tutoring', 'ParentalSupport', 
+                      'Extracurricular', 'Sports', 'Music', 'Volunteering', 'GPA', 'GradeClass']
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    # Eliminar filas con valores nulos solo después de conversión
+    df_clean = df.dropna()
+
+    if len(df_clean) == 0:
+        st.error("❌ No quedaron datos válidos después de la limpieza")
+        return pd.DataFrame()
+
+    try:
+        # Configuración MySQL (ajusta estos valores)
+        connection = get_connection
+        cursor = connection.cursor()
+        
+        # Insertar registros del DataFrame
+        for _, row in df_clean.iterrows():
+            cursor.execute("""
+                INSERT INTO student_performance 
+                (StudentID, Age, Gender, Ethnicity, ParentalEducation, StudyTimeWeekly, 
+                 Absences, Tutoring, ParentalSupport, Extracurricular, Sports, Music, 
+                 Volunteering, GPA, GradeClass)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, tuple(row))
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+        st.success(f"✅ {len(df_clean)} registros guardados exitosamente")
+        
+    except Exception as e:
+        st.error(f"Error guardando en MySQL: {e}")
+    
+    return df_clean
+    
+    # mode = st.sidebar.radio("Modo de carga", ["json", "parquet"])
+    # if st.sidebar.button("Procesar archivo"):
+        # payload = {"bucket": BUCKET, "key": KEY, "mode": mode}
+        
+        # Invocar Lambda
+        # response = lambda_client.invoke(
+        #     FunctionName=LAMBDA_NAME,
+        #     InvocationType="RequestResponse",
+        #     Payload=json.dumps(payload)
+        # )
+        # result = json.loads(response["Payload"].read())
+
+        # if result["statusCode"] == 200:
+        #     body = json.loads(result["body"])
+            
+        #     if mode == "json":
+        #         st.success("Datos obtenidos como JSON")
+        #         df = pd.DataFrame(body["data"])
+        #         st.write("Vista previa:")
+        #         st.dataframe(df)
+
+        #     else:
+        #         st.success("Archivo limpio guardado en S3")
+        #         st.write("Ruta en S3:", body["s3_key"])
+
+        #         # Descargar Parquet procesado desde S3
+        #        obj = s3.get_object(Bucket=BUCKET, Key=body["s3_key"])
+        #         df = pd.read_parquet(obj["Body"])
+        #         st.write("Vista previa:")
+        #         st.dataframe(df.head())
+
+            # Ejemplo de gráfico
+        #     st.subheader("Promedios de columnas numéricas")
+        #     means = body["promedios_columnas"]
+        #     means_df = pd.DataFrame(list(means.items()), columns=["Columna", "Promedio"])
+        #     st.bar_chart(means_df.set_index("Columna"))
+        # else:
+        #     st.error("Error al invocar Lambda") """
+
+# Funcion AWS para recuperar datos
+@st.cache_data
+def load_data():
+    conn = get_connection()
+    query = "SELECT * FROM student_performance;"
+    df = pd.read_sql(query, conn)
+    conn.close()
     return df
 
-df = load_data(file)
-
-# Opciones de filtrado en sidebar
-st.sidebar.markdown("---")
-st.sidebar.subheader("Opciones de Filtrado")
-
-# Filtro por liked
-liked_filter = st.sidebar.selectbox(
-    "Filtrar por preferencia:",
-    options=["Todas", "Solo gustadas (1)", "Solo no gustadas (0)"]
-)
-
-# Filtro por duración
-duration_range = st.sidebar.slider(
-    "Duración de canciones (minutos):",
-    min_value=float(df['duration_min'].min()),
-    max_value=float(df['duration_min'].max()),
-    value=(float(df['duration_min'].min()), float(df['duration_min'].max())),
-    step=0.1
-)
-
-# Filtro por tempo
-tempo_range = st.sidebar.slider(
-    "Rango de Tempo (BPM):",
-    min_value=float(df['tempo'].min()),
-    max_value=float(df['tempo'].max()),
-    value=(float(df['tempo'].min()), float(df['tempo'].max())),
-    step=1.0
-)
-
-# Aplicar filtros
-df_filtered = df.copy()
-
-if liked_filter == "Solo gustadas (1)":
-    df_filtered = df_filtered[df_filtered['liked'] == 1]
-elif liked_filter == "Solo no gustadas (0)":
-    df_filtered = df_filtered[df_filtered['liked'] == 0]
-
-df_filtered = df_filtered[
-    (df_filtered['duration_min'] >= duration_range[0]) & 
-    (df_filtered['duration_min'] <= duration_range[1]) &
-    (df_filtered['tempo'] >= tempo_range[0]) & 
-    (df_filtered['tempo'] <= tempo_range[1])
-]
-
-# Información del dataset en sidebar
-st.sidebar.markdown("---")
-st.sidebar.subheader("Info del Dataset")
-st.sidebar.metric("Total de canciones originales", len(df))
-st.sidebar.metric("Canciones filtradas", len(df_filtered))
-st.sidebar.metric("Canciones gustadas", len(df[df['liked'] == 1]))
-st.sidebar.metric("Canciones no gustadas", len(df[df['liked'] == 0]))
-
-# KPI's principales
-st.header("Métricas Principales")
-
-# Calcular KPIs
-features = ['danceability', 'energy', 'loudness', 'speechiness', 
-            'acousticness', 'instrumentalness', 'liveness', 'valence']
-
-avg_duration = df_filtered['duration_min'].mean()
-most_common_key = df_filtered['key'].mode()[0] if not df_filtered.empty else 0
-avg_tempo = df_filtered['tempo'].mean()
-liked_percentage = (len(df_filtered[df_filtered['liked'] == 1]) / len(df_filtered) * 100) if len(df_filtered) > 0 else 0
-energy_avg = df_filtered['energy'].mean()
-
-c1, c2, c3, c4, c5 = st.columns(5)
-
-with c1:
-    st.metric("Duración Promedio", f"{avg_duration:.2f} min")
-with c2:
-    st.metric("Tonalidad Común", f"Key {most_common_key}")
-with c3:
-    st.metric("Tempo Promedio", f"{avg_tempo:.1f} BPM")
-with c4:
-    st.metric("% Canciones Gustadas", f"{liked_percentage:.1f}%")
-with c5:
-    st.metric("Energía Promedio", f"{energy_avg:.3f}")
-
-st.markdown("---")
-
-# Análisis principal
-tab1, tab2, tab3, tab4 = st.tabs(["📈 Distribuciones", "🎯 Correlaciones", "🎨 Características", "🔍 Comparativas"])
-
-with tab1:
-    st.subheader("Distribución de Características Musicales")
+# Pantalla de inicio
+def show_home_screen():
+    st.title("📚 Sistema de Análisis de Rendimiento Estudiantil")
+    st.markdown("---")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # Histograma de danceability
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.histplot(data=df_filtered, x="danceability", hue="liked", kde=True, 
-                    element="step", stat="percent", ax=ax)
-        plt.title("Distribución de Danceability")
-        plt.xlabel("Danceability")
-        plt.ylabel("Porcentaje")
-        st.pyplot(fig, clear_figure=True)
+        st.header("🔄 Procesar Nuevo Archivo")
+        st.markdown("""
+        **Carga un archivo nuevo para análizarlo:**
+        - El archivo será procesado automáticamente
+        - Los datos serán limpiados y transformados
+        - Se guardará una copia para futuras revisiones
+        - Se mostrarán los análisis estadísticos
+        """)
+        
+        uploaded_file = st.file_uploader(
+            "Selecciona tu archivo CSV",
+            type=['csv'],
+            key="new_file"
+        )
+        
+        if uploaded_file is not None:
+            if st.button("🚀 Procesar con AWS Lambda", type="primary"):
+                processed_df = aws_lambda_processing(uploaded_file)
+                if processed_df is not None:
+                    st.session_state.df = processed_df
+                    st.session_state.data_loaded = True
+                    st.session_state.show_analysis = True
+                    st.rerun()
     
     with col2:
-        # Boxplot de valence
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.boxplot(data=df_filtered, x="liked", y="valence", ax=ax)
-        plt.title("Comparación de Valencia según Preferencia")
-        plt.xlabel("Liked (0 = No, 1 = Sí)")
-        plt.ylabel("Valence")
-        st.pyplot(fig, clear_figure=True)
-    
-    # Distribución de tonalidades
-    st.subheader("Distribución de Tonalidades por Modo")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.countplot(data=df_filtered, x="key", hue="mode", ax=ax)
-    plt.title("Distribución de Tonalidades (Key) por Modo")
-    plt.xlabel("Key (0 = C, 1 = C#, 2 = D, 3 = D#, 4 = E, 5 = F, 6 = F#, 7 = G, 8 = G#, 9 = A, 10 = A#, 11 = B)")
-    plt.ylabel("Número de canciones")
-    st.pyplot(fig, clear_figure=True)
+        st.header("📁 Cargar Análisis Previo")
+        st.markdown("""
+        **Carga un análisis previamente procesado:**
+        - Archivos ya limpiados en S3
+        - Análisis instantáneo
+        - Datos previamente validados
+        """)
+        
+        if st.button("📊 Cargar Análisis", type="secondary"):
+            saved_df = load_data()
+            if saved_df is not None:
+                st.session_state.df = saved_df
+                st.session_state.data_loaded = True
+                st.session_state.show_analysis = True
+                st.rerun()
 
-with tab2:
-    st.subheader("Matriz de Correlaciones")
     
-    # Matriz de correlación
-    numeric_cols = df_filtered.select_dtypes(include=[np.number]).columns
-    corr = df_filtered[numeric_cols].corr()
-    
-    fig, ax = plt.subplots(figsize=(12, 10))
-    sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", 
-                cbar=True, square=True, ax=ax)
-    plt.title("Matriz de Correlación entre Métricas Musicales")
-    plt.tight_layout()
-    st.pyplot(fig, clear_figure=True)
-    
-    # Correlaciones más fuertes
-    st.subheader("Correlaciones más Significativas")
-    
-    # Obtener correlaciones excluyendo la diagonal
-    mask = np.triu(np.ones_like(corr, dtype=bool))
-    corr_values = corr.mask(mask).stack().reset_index()
-    corr_values.columns = ['Variable 1', 'Variable 2', 'Correlación']
-    corr_values = corr_values[corr_values['Variable 1'] != corr_values['Variable 2']]
-    
-    strongest_corr = corr_values.reindex(corr_values['Correlación'].abs().sort_values(ascending=False).index).head(10)
-    
-    for _, row in strongest_corr.iterrows():
-        correlation = row['Correlación']
-        if abs(correlation) > 0.3:  # Solo mostrar correlaciones significativas
-            strength = "Fuerte" if abs(correlation) > 0.7 else "Moderada" if abs(correlation) > 0.5 else "Débil"
-            direction = "positiva" if correlation > 0 else "negativa"
-            st.write(f"**{row['Variable 1']}** vs **{row['Variable 2']}**: {correlation:.3f} ({strength} {direction})")
+    # Información del formato de datos esperado
+    st.markdown("---")
+    st.subheader("📋 Formato de Datos Esperado")
 
-with tab3:
-    st.subheader("Análisis de Características Musicales")
+    st.code("""
+StudentID,Age,Gender,Ethnicity,ParentalEducation,StudyTimeWeekly,Absences,Tutoring,
+ParentalSupport,Extracurricular,Sports,Music,Volunteering,GPA,GradeClass
+    """)
     
-    col1, col2 = st.columns(2)
+    st.markdown("**Descripción de columnas:**")
+    cols_info = {
+        "StudentID": "Identificador único del estudiante",
+        "Age": "Edad del estudiante",
+        "Gender": "Género (0/1)",
+        "Ethnicity": "Etnia (categórica)",
+        "ParentalEducation": "Nivel educativo de los padres",
+        "StudyTimeWeekly": "Horas de estudio semanales",
+        "Absences": "Número de ausencias",
+        "Tutoring": "Recibe tutoría (0/1)",
+        "ParentalSupport": "Nivel de apoyo parental",
+        "Extracurricular": "Actividades extracurriculares (0/1)",
+        "Sports": "Practica deportes (0/1)",
+        "Music": "Estudia música (0/1)",
+        "Volunteering": "Hace voluntariado (0/1)",
+        "GPA": "Promedio de calificaciones",
+        "GradeClass": "Clasificación de grado"
+    }
+    
+    for col, desc in cols_info.items():
+        st.markdown(f"- **{col}**: {desc}")
+
+# Función para mostrar análisis
+def show_analysis():
+    df = st.session_state.df
+    
+    # ✅ AGREGAR ESTA VALIDACIÓN
+    if df is None or len(df) == 0:
+        st.error("No hay datos para mostrar")
+        return
+    
+    # Verificar que las columnas existan y tengan datos válidos
+    if 'Age' not in df.columns or df['Age'].isna().all():
+        st.error("La columna 'Age' no existe o no tiene datos válidos")
+        return
+        
+    # Título principal
+    st.title("📊 Análisis de Rendimiento Estudiantil")
+    
+    # Sidebar con controles
+    st.sidebar.title("🎛️ Panel de Control")
+    st.sidebar.markdown("---")
+    
+    # Botón para volver al inicio
+    if st.sidebar.button("🏠 Volver al Inicio"):
+        st.session_state.show_analysis = False
+        st.session_state.data_loaded = False
+        st.session_state.df = None
+        st.rerun()
+    
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Filtros de Datos")
+    
+    # Filtros en sidebar
+    age_range = st.sidebar.slider(
+        "Rango de Edad:",
+        min_value=int(df['Age'].min()),
+        max_value=int(df['Age'].max()),
+        value=(int(df['Age'].min()), int(df['Age'].max())),
+        step=1
+    )
+    
+    gpa_range = st.sidebar.slider(
+        "Rango de GPA:",
+        min_value=float(df['GPA'].min()),
+        max_value=float(df['GPA'].max()),
+        value=(float(df['GPA'].min()), float(df['GPA'].max())),
+        step=0.1
+    )
+    
+    tutoring_filter = st.sidebar.selectbox(
+        "Filtrar por Tutoría:",
+        options=["Todos", "Con tutoría (1)", "Sin tutoría (0)"]
+    )
+    
+    gender_filter = st.sidebar.selectbox(
+        "Filtrar por Género:",
+        options=["Todos", "Género 0", "Género 1"]
+    )
+    
+    # Aplicar filtros
+    df_filtered = df.copy()
+    df_filtered = df_filtered[
+        (df_filtered['Age'] >= age_range[0]) & 
+        (df_filtered['Age'] <= age_range[1]) &
+        (df_filtered['GPA'] >= gpa_range[0]) & 
+        (df_filtered['GPA'] <= gpa_range[1])
+    ]
+    
+    if tutoring_filter == "Con tutoría (1)":
+        df_filtered = df_filtered[df_filtered['Tutoring'] == 1]
+    elif tutoring_filter == "Sin tutoría (0)":
+        df_filtered = df_filtered[df_filtered['Tutoring'] == 0]
+    
+    if gender_filter == "Género 0":
+        df_filtered = df_filtered[df_filtered['Gender'] == 0]
+    elif gender_filter == "Género 1":
+        df_filtered = df_filtered[df_filtered['Gender'] == 1]
+    
+    # Información del dataset en sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📈 Info del Dataset")
+    st.sidebar.metric("Estudiantes originales", len(df))
+    st.sidebar.metric("Estudiantes filtrados", len(df_filtered))
+    st.sidebar.metric("GPA promedio", f"{df_filtered['GPA'].mean():.2f}")
+    st.sidebar.metric("Edad promedio", f"{df_filtered['Age'].mean():.1f}")
+    
+    # KPIs principales
+    st.header("📊 Métricas Principales")
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
-        # Duración promedio por característica (tu gráfico original mejorado)
-        features = ['danceability', 'energy', 'loudness', 'speechiness', 
-                   'acousticness', 'instrumentalness', 'liveness', 'valence']
-        
-        duration_by_feature = {}
-        for feature in features:
-            if len(df_filtered) > 0:
-                duration_by_feature[feature] = df_filtered.groupby(pd.cut(df_filtered[feature], bins=5))['duration_ms'].mean().mean()
-        
-        if duration_by_feature:
-            res_df = pd.DataFrame(list(duration_by_feature.items()), columns=['Feature', 'Avg_duration_ms'])
+        st.metric("Estudiantes Total", len(df_filtered))
+    with col2:
+        st.metric("GPA Promedio", f"{df_filtered['GPA'].mean():.2f}")
+    with col3:
+        st.metric("Horas Estudio/Semana", f"{df_filtered['StudyTimeWeekly'].mean():.1f}")
+    with col4:
+        st.metric("Ausencias Promedio", f"{df_filtered['Absences'].mean():.1f}")
+    with col5:
+        tutoring_pct = (df_filtered['Tutoring'].sum() / len(df_filtered) * 100)
+        st.metric("% Con Tutoría", f"{tutoring_pct:.1f}%")
+    
+    st.markdown("---")
+    
+    # Tabs de análisis
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Estadísticas", "📈 Distribuciones", "📊 Comparativas", "🔗 Correlaciones", "🎯 Análisis Específicos"])
+    
+    with tab1:
+            st.subheader("Estadísticas Descriptivas")
             
+            # Estadísticas generales
+            st.write("**Estadísticas del dataset filtrado:**")
+            st.dataframe(df_filtered.describe())
+            
+            # Distribución por categorías
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Distribución por Género:**")
+                gender_dist = df_filtered['Gender'].value_counts()
+                st.dataframe(gender_dist)
+                
+                st.write("**Distribución por Tutoría:**")
+                tutoring_dist = df_filtered['Tutoring'].value_counts()
+                st.dataframe(tutoring_dist)
+            
+            with col2:
+                st.write("**Distribución por Apoyo Parental:**")
+                support_dist = df_filtered['ParentalSupport'].value_counts()
+                st.dataframe(support_dist)
+                
+                if 'GradeClass' in df_filtered.columns:
+                    st.write("**Distribución por Clase de Calificación:**")
+                    grade_dist = df_filtered['GradeClass'].value_counts()
+                    st.dataframe(grade_dist)
+
+    with tab2:
+        st.subheader("Distribución de Variables Clave")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # 1. Histograma del GPA
             fig, ax = plt.subplots(figsize=(10, 6))
-            bars = plt.bar(res_df['Feature'], res_df['Avg_duration_ms'], 
-                          color=plt.cm.viridis(np.linspace(0, 1, len(res_df))))
-            plt.xticks(rotation=45, ha='right')
-            plt.title("Duración Promedio por Característica Musical")
-            plt.ylabel("Duración Promedio (ms)")
-            plt.tight_layout()
+            sns.histplot(df_filtered['GPA'], bins=30, kde=True, color='skyblue', ax=ax)
+            plt.title('Distribución del GPA')
+            plt.xlabel('GPA')
+            plt.ylabel('Frecuencia')
+            st.pyplot(fig, clear_figure=True)
+        
+        with col2:
+            # 9. Distribución de Ausencias
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.histplot(df_filtered['Absences'], bins=30, kde=True, color='salmon', ax=ax)
+            plt.title("Distribución de Ausencias")
+            plt.xlabel("Número de Ausencias")
+            plt.ylabel("Frecuencia")
+            st.pyplot(fig, clear_figure=True)
+        
+        # Distribución de tiempo de estudio
+        st.subheader("Distribución de Tiempo de Estudio Semanal")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        sns.histplot(df_filtered['StudyTimeWeekly'], bins=25, kde=True, color='lightgreen', ax=ax)
+        plt.title("Distribución del Tiempo de Estudio Semanal")
+        plt.xlabel("Horas de Estudio por Semana")
+        plt.ylabel("Frecuencia")
+        st.pyplot(fig, clear_figure=True)
+    
+    with tab3:
+        st.subheader("Análisis Comparativo por Categorías")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # 2. Boxplot de GPA por clase de calificación
+            if 'GradeClass' in df_filtered.columns:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                sns.boxplot(x='GradeClass', y='GPA', data=df_filtered, palette='Set2', ax=ax)
+                plt.title('GPA por Clase de Calificación')
+                plt.xlabel('Clase de Calificación')
+                plt.ylabel('GPA')
+                st.pyplot(fig, clear_figure=True)
+        
+        with col2:
+            # 6. Boxplot de GPA por apoyo parental
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.boxplot(x='ParentalSupport', y='GPA', data=df_filtered, palette='pastel', ax=ax)
+            plt.title('GPA por Nivel de Apoyo Parental')
+            plt.xlabel('Apoyo Parental')
+            plt.ylabel('GPA')
+            st.pyplot(fig, clear_figure=True)
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            # 11. GPA por Nivel Educativo de los Padres
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.boxplot(x='ParentalEducation', y='GPA', data=df_filtered, palette='Set3', ax=ax)
+            plt.title("GPA por Nivel Educativo de los Padres")
+            plt.xlabel("Nivel Educativo de los Padres")
+            plt.ylabel("GPA")
+            st.pyplot(fig, clear_figure=True)
+        
+        with col4:
+            # 13. GPA por Actividades Extracurriculares
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.boxplot(x='Extracurricular', y='GPA', data=df_filtered, palette='Set2', ax=ax)
+            plt.title("GPA por Participación en Actividades Extracurriculares")
+            plt.xlabel("Participación en Actividades Extracurriculares (0=No, 1=Sí)")
+            plt.ylabel("GPA")
+            st.pyplot(fig, clear_figure=True)
+        
+        # Comparaciones adicionales
+        col5, col6 = st.columns(2)
+        
+        with col5:
+            # GPA por participación en deportes
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.boxplot(x='Sports', y='GPA', data=df_filtered, palette='Set1', ax=ax)
+            plt.title("GPA por Participación en Deportes")
+            plt.xlabel("Participación en Deportes (0=No, 1=Sí)")
+            plt.ylabel("GPA")
+            st.pyplot(fig, clear_figure=True)
+        
+        with col6:
+            # 14. GPA por Participación en Música
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.boxplot(x='Music', y='GPA', data=df_filtered, palette='Set1', ax=ax)
+            plt.title("GPA por Participación en Música")
+            plt.xlabel("Participación en Música (0=No, 1=Sí)")
+            plt.ylabel("GPA")
             st.pyplot(fig, clear_figure=True)
     
-    with col2:
-        # Tempo promedio por característica (tu gráfico original mejorado)
-        tempo_by_feature = {}
-        for feature in features:
-            if len(df_filtered) > 0 and df_filtered[feature].mean() != 0:
-                tempo_by_feature[feature] = (df_filtered['tempo'] * df_filtered[feature]).mean() / df_filtered[feature].mean()
+    with tab4:
+        st.subheader("Análisis de Correlaciones")
         
-        if tempo_by_feature:
-            tempo_df = pd.Series(tempo_by_feature)
+        # 4 y 5. Matriz de correlación y mapa de calor
+        correlation_cols = ['Age', 'StudyTimeWeekly', 'Absences', 'GPA', 'ParentalSupport', 'Tutoring', 
+                          'ParentalEducation', 'Extracurricular', 'Sports', 'Music', 'Volunteering']
+        
+        # Filtrar solo las columnas que existen en el DataFrame
+        available_cols = [col for col in correlation_cols if col in df_filtered.columns]
+        correlation_matrix = df_filtered[available_cols].corr()
+        
+        # Mapa de calor
+        fig, ax = plt.subplots(figsize=(12, 10))
+        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
+        plt.title('Mapa de Calor de Correlaciones')
+        st.pyplot(fig, clear_figure=True)
+        
+        # Mostrar correlaciones más fuertes
+        st.subheader("Correlaciones más Significativas")
+        mask = np.triu(np.ones_like(correlation_matrix, dtype=bool))
+        corr_values = correlation_matrix.mask(mask).stack().reset_index()
+        corr_values.columns = ['Variable 1', 'Variable 2', 'Correlación']
+        corr_values = corr_values[corr_values['Variable 1'] != corr_values['Variable 2']]
+        strongest_corr = corr_values.reindex(corr_values['Correlación'].abs().sort_values(ascending=False).index).head(10)
+        
+        for _, row in strongest_corr.iterrows():
+            correlation = row['Correlación']
+            if abs(correlation) > 0.1:  # Solo mostrar correlaciones relevantes
+                strength = "Fuerte" if abs(correlation) > 0.6 else "Moderada" if abs(correlation) > 0.3 else "Débil"
+                direction = "positiva" if correlation > 0 else "negativa"
+                st.write(f"**{row['Variable 1']}** vs **{row['Variable 2']}**: {correlation:.3f} ({strength} {direction})")
+    
+    with tab5:
+        st.subheader("Análisis Específicos")
+        
+        # 3. Prueba t de Student: GPA entre estudiantes con y sin tutoría
+        st.write("**Análisis Estadístico: Efecto de la Tutoría en el GPA**")
+        
+        if len(df_filtered[df_filtered['Tutoring'] == 1]) > 0 and len(df_filtered[df_filtered['Tutoring'] == 0]) > 0:
+            gpa_tutoring = df_filtered[df_filtered['Tutoring'] == 1]['GPA']
+            gpa_no_tutoring = df_filtered[df_filtered['Tutoring'] == 0]['GPA']
+            t_stat, p_value = ttest_ind(gpa_tutoring, gpa_no_tutoring)
             
-            fig, ax = plt.subplots(figsize=(10, 6))
-            tempo_df.plot(kind='bar', ax=ax, color=plt.cm.plasma(np.linspace(0, 1, len(tempo_df))))
-            plt.title("Tempo Promedio por Característica")
-            plt.ylabel("Tempo Promedio (BPM)")
-            plt.xticks(rotation=45, ha="right")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Estadístico t", f"{t_stat:.2f}")
+            with col2:
+                st.metric("Valor p", f"{p_value:.4e}")
+            with col3:
+                significance = "Significativo" if p_value < 0.05 else "No significativo"
+                st.metric("Resultado", significance)
+            
+            st.write(f"**Interpretación:** {'Existe una diferencia significativa' if p_value < 0.05 else 'No existe diferencia significativa'} en el GPA entre estudiantes con y sin tutoría.")
+        
+        # 7. Scatterplot de GPA vs. tiempo de estudio
+        st.subheader("Relación entre Variables Continuas")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        sns.scatterplot(x='StudyTimeWeekly', y='GPA', data=df_filtered, alpha=0.6, ax=ax)
+        plt.title('Relación entre Tiempo de Estudio Semanal y GPA')
+        plt.xlabel('Horas de Estudio Semanal')
+        plt.ylabel('GPA')
+        st.pyplot(fig, clear_figure=True)
+        
+        # Análisis de GPA por múltiples factores
+        st.subheader("Análisis Multifactorial del GPA")
+        
+        factors = ['Tutoring', 'ParentalSupport', 'Extracurricular', 'Sports', 'Music']
+        available_factors = [f for f in factors if f in df_filtered.columns]
+        
+        if len(available_factors) > 0:
+            fig, axes = plt.subplots(1, len(available_factors), figsize=(5*len(available_factors), 6))
+            if len(available_factors) == 1:
+                axes = [axes]
+            
+            for i, factor in enumerate(available_factors):
+                sns.boxplot(x=factor, y='GPA', data=df_filtered, ax=axes[i])
+                axes[i].set_title(f'GPA por {factor}')
+            
             plt.tight_layout()
             st.pyplot(fig, clear_figure=True)
 
-with tab4:
-    st.subheader("Comparativa: Canciones Gustadas vs No Gustadas")
-    
-    if len(df_filtered[df_filtered['liked'] == 1]) > 0 and len(df_filtered[df_filtered['liked'] == 0]) > 0:
-        # Radar Chart
-        categories = ["danceability", "energy", "valence", "acousticness", "instrumentalness", "liveness"]
-        stats = df_filtered.groupby("liked")[categories].mean()
-        
-        labels = list(stats.columns)
-        num_vars = len(labels)
-        angles = [n / float(num_vars) * 2 * pi for n in range(num_vars)]
-        angles += angles[:1]
-        
-        fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(projection='polar'))
-        
-        colors = ['#FF6B6B', '#4ECDC4']
-        for i, (idx, row) in enumerate(stats.iterrows()):
-            values = row.tolist()
-            values += values[:1]
-            ax.plot(angles, values, 'o-', linewidth=2, 
-                   label=f"{'Gustadas' if idx == 1 else 'No Gustadas'}", 
-                   color=colors[i])
-            ax.fill(angles, values, alpha=0.25, color=colors[i])
-        
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(labels)
-        ax.set_ylim(0, 1)
-        plt.title("Perfil Promedio: Canciones Gustadas vs No Gustadas", pad=20)
-        plt.legend(loc='upper right', bbox_to_anchor=(1.2, 1.0))
-        st.pyplot(fig, clear_figure=True)
-        
-        # Tabla comparativa
-        st.subheader("Estadísticas Comparativas")
-        comparison_stats = df_filtered.groupby("liked")[["danceability", "energy", "valence", "tempo", "duration_min"]].mean()
-        comparison_stats.index = ['No Gustadas', 'Gustadas']
-        st.dataframe(comparison_stats.round(3))
+# Lógica principal
+def main():
+    if not st.session_state.show_analysis:
+        show_home_screen()
     else:
-        st.warning("No hay suficientes datos en ambas categorías (gustadas/no gustadas) para realizar la comparación.")
+        show_analysis()
 
-# Footer con información adicional
-st.markdown("---")
-st.markdown("**💡 Consejos de uso:**")
-st.markdown("- Utiliza los filtros en la barra lateral para explorar subconjuntos específicos de datos")
-st.markdown("- Las correlaciones te ayudan a entender qué características están relacionadas")
-st.markdown("- El radar chart muestra el 'perfil musical' de las canciones que te gustan vs las que no")
+if __name__ == "__main__":
+    main()
